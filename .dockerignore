@@ -1,0 +1,19 @@
+
+# VCS
+.git
+.gitignore
+
+# Docs and dev files that don't need to be in the image
+README.md
+resources.md
+
+# Node / tooling (if present later)
+node_modules
+npm-debug.log
+dist
+build
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+*.swp
