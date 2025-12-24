@@ -1,62 +1,71 @@
 
-name: Build and Push Docker image to Docker Hub
+name: Multi-Stage Docker Pipeline
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches:
+      - main
+  workflow_dispatch:    # Allow manual runs from the Actions tab
+  schedule:
+    # Daily at 11:00 IST => 05:30 UTC
+    - cron: "30 5 * * *"
 
 jobs:
-  docker:
+  Build:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Extract Docker metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Build Docker image
+        run: |
+          docker build -t HCJ:latest .
+          docker save HCJ:latest > image.tar
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
         with:
-          images: |
-            sivaprasad/hcj
-          tags: |
-            type=raw,value=latest
-            type=sha,format=short
+          name: docker-image
+          path: image.tar
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+  Test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          name: docker-image
 
-      # Optional: Cache to speed up builds
-      - name: Build and push (single-arch)
-        uses: docker/build-push-action@v6
+      - name: Load Docker image
+        run: docker load < image.tar
+
+      - name: Test Docker image
+        run: |
+          docker run -d -p 8080:80 HCJ:latest
+          sleep 5
+          curl http://localhost:8080/
+  Push:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
         with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ steps.meta.outputs.images }}:buildcache
-          cache-to: type=registry,ref=${{ steps.meta.outputs.images }}:buildcache,mode=max
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # If you want multi-arch images (e.g., linux/amd64 + linux/arm64), uncomment below and comment out the single-arch step above:
-      # - name: Build and push (multi-arch)
-      #   uses: docker/build-push-action@v6
-      #   with:
-      #     context: .
-      #     file: ./Dockerfile
-      #     push: true
-      #     platforms: linux/amd64,linux/arm64
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
-      #     cache-from: type=registry,ref=${{ steps.meta.outputs.images }}:buildcache
-      #     cache-to: type=registry,ref=${{ steps.meta.outputs.images }}:buildcache,mode=max
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image
+        run: docker load < image.tar
+
+      - name: Tag and Push Docker image
+        run: |
+          docker tag HCJ:latest golisivaprasad/HCJ:latest
+          docker push golisivaprasad/HCJ:latest
