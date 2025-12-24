@@ -19,8 +19,8 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t HCJ:latest .
-          docker save HCJ:latest > image.tar
+          docker build -t hcj:latest .
+          docker save hcj:latest > image.tar
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
@@ -41,7 +41,7 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run -d -p 8080:80 HCJ:latest
+          docker run -d -p 8080:80 hcj:latest
           sleep 5
           curl http://localhost:8080/
   Push:
@@ -67,5 +67,5 @@ jobs:
 
       - name: Tag and Push Docker image
         run: |
-          docker tag HCJ:latest golisivaprasad/HCJ:latest
-          docker push golisivaprasad/HCJ:latest
+          docker tag hcj:latest golisivaprasad/hcj:latest
+          docker push golisivaprasad/hcj:latest
